@@ -680,49 +680,34 @@ class Game2048 {
         try {
             const currentTime = this.audioContext.currentTime;
             
-            // Main impact sound (coin hitting tray)
-            const impact = this.audioContext.createOscillator();
-            const impactGain = this.audioContext.createGain();
-            const impactFilter = this.audioContext.createBiquadFilter();
+            // Pleasant chime sound - C major chord
+            const frequencies = [523.25, 659.25, 783.99]; // C5, E5, G5
             
-            impact.connect(impactFilter);
-            impactFilter.connect(impactGain);
-            impactGain.connect(this.audioContext.destination);
-            
-            impact.frequency.setValueAtTime(150, currentTime);
-            impact.type = 'square';
-            impactFilter.type = 'highpass';
-            impactFilter.frequency.setValueAtTime(100, currentTime);
-            
-            impactGain.gain.setValueAtTime(0.15, currentTime);
-            impactGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.05);
-            
-            impact.start(currentTime);
-            impact.stop(currentTime + 0.05);
-            
-            // Metallic ring (coin resonance)
-            const ring = this.audioContext.createOscillator();
-            const ringGain = this.audioContext.createGain();
-            const ringFilter = this.audioContext.createBiquadFilter();
-            
-            ring.connect(ringFilter);
-            ringFilter.connect(ringGain);
-            ringGain.connect(this.audioContext.destination);
-            
-            ring.frequency.setValueAtTime(2400, currentTime + 0.01);
-            ring.frequency.exponentialRampToValueAtTime(1800, currentTime + 0.3);
-            ring.type = 'sine';
-            
-            ringFilter.type = 'bandpass';
-            ringFilter.frequency.setValueAtTime(2000, currentTime);
-            ringFilter.Q.setValueAtTime(8, currentTime);
-            
-            ringGain.gain.setValueAtTime(0, currentTime);
-            ringGain.gain.linearRampToValueAtTime(0.08, currentTime + 0.02);
-            ringGain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.4);
-            
-            ring.start(currentTime + 0.01);
-            ring.stop(currentTime + 0.4);
+            frequencies.forEach((freq, index) => {
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                const filter = this.audioContext.createBiquadFilter();
+                
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.frequency.setValueAtTime(freq, currentTime);
+                osc.type = 'sine';
+                
+                // Soft low-pass filter for warmth
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(2000, currentTime);
+                
+                // Gentle bell-like envelope
+                const startTime = currentTime + index * 0.05;
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.1, startTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.8);
+                
+                osc.start(startTime);
+                osc.stop(startTime + 0.8);
+            });
             
         } catch (error) {
             console.log('Audio not supported');
@@ -735,7 +720,7 @@ class Game2048 {
         try {
             const currentTime = this.audioContext.currentTime;
             
-            // Soft pop sound for tile placement
+            // Gentle water drop sound
             const osc = this.audioContext.createOscillator();
             const gain = this.audioContext.createGain();
             const filter = this.audioContext.createBiquadFilter();
@@ -744,22 +729,23 @@ class Game2048 {
             filter.connect(gain);
             gain.connect(this.audioContext.destination);
             
-            // Gentle frequency sweep for pleasant pop
-            osc.frequency.setValueAtTime(400, currentTime);
-            osc.frequency.exponentialRampToValueAtTime(200, currentTime + 0.1);
+            // Soft frequency sweep like a water drop
+            osc.frequency.setValueAtTime(800, currentTime);
+            osc.frequency.exponentialRampToValueAtTime(300, currentTime + 0.15);
             osc.type = 'sine';
             
-            // Low-pass filter for softer sound
+            // Warm low-pass filter
             filter.type = 'lowpass';
-            filter.frequency.setValueAtTime(800, currentTime);
+            filter.frequency.setValueAtTime(1200, currentTime);
+            filter.Q.setValueAtTime(2, currentTime);
             
-            // Gentle envelope
+            // Soft bubble-like envelope
             gain.gain.setValueAtTime(0, currentTime);
-            gain.gain.linearRampToValueAtTime(0.06, currentTime + 0.01);
-            gain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.12);
+            gain.gain.linearRampToValueAtTime(0.08, currentTime + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
             
             osc.start(currentTime);
-            osc.stop(currentTime + 0.12);
+            osc.stop(currentTime + 0.2);
             
         } catch (error) {
             console.log('Audio not supported');
@@ -794,6 +780,46 @@ class Game2048 {
             button.classList.add('muted');
         }
     }
+    
+    playMilestoneSound() {
+        if (!this.soundEnabled || !this.audioContext) return;
+        
+        try {
+            const currentTime = this.audioContext.currentTime;
+            
+            // Ascending celebration chime - C major scale
+            const notes = [523.25, 587.33, 659.25, 698.46, 783.99]; // C5, D5, E5, F5, G5
+            
+            notes.forEach((freq, index) => {
+                const osc = this.audioContext.createOscillator();
+                const gain = this.audioContext.createGain();
+                const filter = this.audioContext.createBiquadFilter();
+                
+                osc.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.audioContext.destination);
+                
+                osc.frequency.setValueAtTime(freq, currentTime);
+                osc.type = 'sine';
+                
+                // Bright filter for celebration
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(3000, currentTime);
+                
+                // Quick ascending notes
+                const startTime = currentTime + index * 0.1;
+                gain.gain.setValueAtTime(0, startTime);
+                gain.gain.linearRampToValueAtTime(0.12, startTime + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.3);
+                
+                osc.start(startTime);
+                osc.stop(startTime + 0.3);
+            });
+            
+        } catch (error) {
+            console.log('Audio not supported');
+        }
+    }
 
     checkMilestones() {
         for (let i = 0; i < this.size; i++) {
@@ -819,8 +845,13 @@ class Game2048 {
         
         popup.classList.remove('hidden');
         
-        // Play milestone sound
-        this.playSound(659, 300);
+        // Play milestone sound - ascending chime
+        this.playMilestoneSound();
+        
+        // Auto-hide after 3 seconds
+        setTimeout(() => {
+            popup.classList.add('hidden');
+        }, 3000);
     }
 
     closeMilestone() {
