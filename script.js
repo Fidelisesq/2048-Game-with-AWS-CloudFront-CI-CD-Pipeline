@@ -888,10 +888,10 @@ class Game2048 {
         // Play milestone sound - ascending chime
         this.playMilestoneSound();
         
-        // Auto-hide after 3 seconds
+        // Auto-hide after 1 second
         setTimeout(() => {
             popup.classList.add('hidden');
-        }, 3000);
+        }, 1000);
     }
 
     closeMilestone() {
