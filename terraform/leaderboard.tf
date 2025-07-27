@@ -152,9 +152,9 @@ resource "aws_apigatewayv2_stage" "api_stage" {
   name        = "prod"
   auto_deploy = true
   
-  throttle_settings {
-    rate_limit  = 100
-    burst_limit = 200
+  default_route_settings {
+    throttling_rate_limit  = 100
+    throttling_burst_limit = 200
   }
   
   route_settings {
