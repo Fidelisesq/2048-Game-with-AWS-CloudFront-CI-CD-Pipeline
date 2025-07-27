@@ -1,6 +1,6 @@
 # Building a Production-Ready 2048 Game with AWS CloudFront & Serverless Backend
 
-[Architecture Diagram](https://github.com/Fidelisesq/2048-Game-with-AWS-CloudFront-CI-CD-Pipeline/blob/cloudfront-hosting/Architecture-diagram.png)
+![Architecture Diagram](https://github.com/Fidelisesq/2048-Game-with-AWS-CloudFront-CI-CD-Pipeline/blob/cloudfront-hosting/Architecture-diagram.png)
 
 A feature-rich 2048 puzzle game deployed on AWS using S3 + CloudFront with complete serverless backend functionality. Features static hosting via CloudFront distribution, real-time leaderboard with DynamoDB, Lambda API with AWS SDK v3, enhanced social sharing with screenshot capability, and complete CI/CD automation through GitHub Actions.
 
