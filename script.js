@@ -5,6 +5,7 @@ class Game2048 {
         this.size = 4;
         this.hasWon = false;
         this.highScore = this.loadHighScore();
+        this.playerBestScore = this.loadPlayerBestScore();
         this.currentTheme = this.loadTheme();
         this.soundEnabled = this.loadSoundSetting();
         this.achievedMilestones = new Set();
@@ -136,20 +137,13 @@ class Game2048 {
         
         // Always check for loss after any move attempt
         if (this.checkLoss()) {
-            // Auto-submit final score if player name exists and score is high enough
-            const savedName = localStorage.getItem('2048-player-name');
-            if (savedName && this.score >= 1000) {
-                this.autoSubmitHighScore(savedName);
-            }
-            
             this.trackEvent('game_over', { 
                 score: this.score, 
                 moves: this.moveCount,
                 duration: Math.round((Date.now() - this.startTime) / 1000)
             });
             setTimeout(() => {
-                alert('Game Over! No more moves available.');
-                this.restart();
+                this.handleGameOver();
             }, 100);
         }
     }
@@ -316,6 +310,14 @@ class Game2048 {
 
     saveHighScore() {
         localStorage.setItem('2048-highscore', this.highScore.toString());
+    }
+
+    loadPlayerBestScore() {
+        return parseInt(localStorage.getItem('2048-player-best') || '0');
+    }
+
+    savePlayerBestScore() {
+        localStorage.setItem('2048-player-best', this.playerBestScore.toString());
     }
 
     async shareScore() {
@@ -526,9 +528,17 @@ class Game2048 {
         const leaderboard = document.getElementById('leaderboard');
         if (leaderboard.classList.contains('hidden')) {
             leaderboard.classList.remove('hidden');
+            this.initializePlayerName();
             await this.loadLeaderboard();
         } else {
             leaderboard.classList.add('hidden');
+        }
+    }
+
+    initializePlayerName() {
+        const savedName = localStorage.getItem('2048-player-name');
+        if (savedName) {
+            document.getElementById('player-name').value = savedName;
         }
     }
 
@@ -577,13 +587,12 @@ class Game2048 {
             return;
         }
         
-        // Save player name for auto-submissions
+        // Save player name for future auto-submissions
         localStorage.setItem('2048-player-name', playerName);
         
         try {
             const apiUrl = this.getApiUrl();
-            const payload = { playerName, score: this.score };
-            console.log('Submitting score to:', apiUrl + '/score', payload);
+            const payload = { playerName, score: this.score, isPersonalBest: false };
             
             const response = await fetch(apiUrl + '/score', {
                 method: 'POST',
@@ -593,16 +602,18 @@ class Game2048 {
                 body: JSON.stringify(payload)
             });
             
-            console.log('Submit response status:', response.status);
-            const responseText = await response.text();
-            console.log('Submit response:', responseText);
+            const result = await response.json();
             
             if (response.ok) {
-                alert('Score submitted successfully!');
+                if (result.added) {
+                    alert(`Score submitted successfully! Ranked #${result.rank} on leaderboard.`);
+                } else {
+                    alert('Score submitted but not high enough for current leaderboard ranking.');
+                }
                 document.getElementById('player-name').value = '';
                 await this.loadLeaderboard();
             } else {
-                alert(`Failed to submit score: ${response.status} ${response.statusText}`);
+                alert(result.error || 'Failed to submit score');
             }
         } catch (error) {
             alert('Failed to submit score: ' + error.message);
@@ -622,10 +633,38 @@ class Game2048 {
         return fallbackUrl;
     }
 
-    async autoSubmitHighScore(playerName) {
+    async handleGameOver() {
+        const savedName = localStorage.getItem('2048-player-name');
+        const isPersonalBest = this.score > this.playerBestScore;
+        
+        if (isPersonalBest) {
+            this.playerBestScore = this.score;
+            this.savePlayerBestScore();
+            
+            if (savedName) {
+                // Auto-save personal best with existing name
+                await this.autoSubmitScore(savedName);
+                alert(`Game Over! New personal best: ${this.score.toLocaleString()} points!\nScore automatically saved to leaderboard.`);
+            } else {
+                // Prompt for name for personal best
+                const playerName = prompt(`Game Over! New personal best: ${this.score.toLocaleString()} points!\nEnter your name to save to leaderboard:`);
+                if (playerName && playerName.trim()) {
+                    localStorage.setItem('2048-player-name', playerName.trim());
+                    await this.autoSubmitScore(playerName.trim());
+                } else {
+                    alert('Game Over! Score not saved.');
+                }
+            }
+        } else {
+            alert('Game Over! No more moves available.');
+        }
+        
+        this.restart();
+    }
+
+    async autoSubmitScore(playerName) {
         try {
             const apiUrl = this.getApiUrl();
-            console.log('Auto-submitting final score:', this.score);
             await fetch(apiUrl + '/score', {
                 method: 'POST',
                 headers: {
@@ -633,7 +672,8 @@ class Game2048 {
                 },
                 body: JSON.stringify({
                     playerName: playerName,
-                    score: this.score
+                    score: this.score,
+                    isPersonalBest: true
                 })
             });
         } catch (error) {

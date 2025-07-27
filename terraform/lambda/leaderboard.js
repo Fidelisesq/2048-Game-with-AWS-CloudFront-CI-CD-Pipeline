@@ -48,7 +48,7 @@ exports.handler = async (event) => {
             // Submit new score
             const requestBody = event.body || '{}';
             const body = JSON.parse(requestBody);
-            const { playerName, score } = body;
+            const { playerName, score, isPersonalBest } = body;
 
             console.log('Parsed body:', body);
 
@@ -60,24 +60,92 @@ exports.handler = async (event) => {
                 };
             }
 
-            const params = {
+            const scoreValue = parseInt(score);
+            const playerNameStr = playerName.toString();
+
+            // For personal bests, always save
+            if (isPersonalBest) {
+                const params = {
+                    TableName: '2048-leaderboard',
+                    Item: {
+                        id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
+                        playerName: playerNameStr,
+                        score: scoreValue,
+                        game_type: 'classic',
+                        timestamp: new Date().toISOString(),
+                        isPersonalBest: true
+                    }
+                };
+                await dynamodb.send(new PutCommand(params));
+                return {
+                    statusCode: 201,
+                    headers,
+                    body: JSON.stringify({ message: 'Personal best saved successfully', added: true })
+                };
+            }
+
+            // For manual submissions, check if score qualifies for leaderboard
+            const leaderboardParams = {
                 TableName: '2048-leaderboard',
-                Item: {
-                    id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
-                    playerName: playerName.toString(),
-                    score: parseInt(score),
-                    game_type: 'classic',
-                    timestamp: new Date().toISOString()
-                }
+                IndexName: 'ScoreIndex',
+                KeyConditionExpression: 'game_type = :gt',
+                ExpressionAttributeValues: {
+                    ':gt': 'classic'
+                },
+                ScanIndexForward: false,
+                Limit: 10
             };
 
-            console.log('DynamoDB params:', params);
-            await dynamodb.send(new PutCommand(params));
-            return {
-                statusCode: 201,
-                headers,
-                body: JSON.stringify({ message: 'Score submitted successfully' })
-            };
+            const leaderboard = await dynamodb.send(new QueryCommand(leaderboardParams));
+            const currentScores = leaderboard.Items || [];
+            
+            // Check if score qualifies (top 10 or better than lowest)
+            let shouldAdd = false;
+            let rank = 1;
+            
+            if (currentScores.length < 10) {
+                shouldAdd = true;
+                rank = currentScores.filter(item => item.score > scoreValue).length + 1;
+            } else {
+                const lowestScore = currentScores[currentScores.length - 1].score;
+                if (scoreValue > lowestScore) {
+                    shouldAdd = true;
+                    rank = currentScores.filter(item => item.score > scoreValue).length + 1;
+                }
+            }
+
+            if (shouldAdd) {
+                const params = {
+                    TableName: '2048-leaderboard',
+                    Item: {
+                        id: Date.now().toString() + '-' + Math.random().toString(36).substr(2, 9),
+                        playerName: playerNameStr,
+                        score: scoreValue,
+                        game_type: 'classic',
+                        timestamp: new Date().toISOString(),
+                        isPersonalBest: false
+                    }
+                };
+                await dynamodb.send(new PutCommand(params));
+                return {
+                    statusCode: 201,
+                    headers,
+                    body: JSON.stringify({ 
+                        message: 'Score submitted successfully', 
+                        added: true, 
+                        rank: rank 
+                    })
+                };
+            } else {
+                return {
+                    statusCode: 200,
+                    headers,
+                    body: JSON.stringify({ 
+                        message: 'Score received but not high enough for leaderboard', 
+                        added: false 
+                    })
+                };
+            }
         }
 
         return {

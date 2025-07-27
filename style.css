@@ -229,6 +229,12 @@ body {
 .submit-score {
     margin-top: 20px;
     display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.submit-score > div {
+    display: flex;
     gap: 10px;
 }
 
@@ -252,6 +258,14 @@ body {
 
 .submit-score button:hover {
     background: #9f8a76;
+}
+
+.submit-info {
+    font-size: 12px;
+    color: var(--text-color);
+    opacity: 0.7;
+    margin: 0;
+    text-align: center;
 }
 
 /* Dark Theme */
