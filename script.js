@@ -582,10 +582,25 @@ class Game2048 {
             return;
         }
         
+        // Basic input validation
+        if (playerName.length > 20 || !/^[a-zA-Z0-9\s-_]+$/.test(playerName)) {
+            alert('Name must be 20 characters or less and contain only letters, numbers, spaces, hyphens, and underscores');
+            return;
+        }
+        
         if (this.score === 0) {
             alert('Play a game first!');
             return;
         }
+        
+        // Rate limiting - prevent spam submissions
+        const lastSubmit = localStorage.getItem('last-submit-time');
+        const now = Date.now();
+        if (lastSubmit && (now - parseInt(lastSubmit)) < 10000) {
+            alert('Please wait 10 seconds between submissions');
+            return;
+        }
+        localStorage.setItem('last-submit-time', now.toString());
         
         // Save player name for future auto-submissions
         localStorage.setItem('2048-player-name', playerName);
@@ -610,6 +625,7 @@ class Game2048 {
                 } else {
                     alert('Score submitted but not high enough for current leaderboard ranking.');
                 }
+                localStorage.setItem('last-submit-time', Date.now().toString());
                 document.getElementById('player-name').value = '';
                 await this.loadLeaderboard();
             } else {

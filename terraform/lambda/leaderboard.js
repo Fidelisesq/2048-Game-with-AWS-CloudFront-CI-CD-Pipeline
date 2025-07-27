@@ -61,7 +61,24 @@ exports.handler = async (event) => {
             }
 
             const scoreValue = parseInt(score);
-            const playerNameStr = playerName.toString();
+            const playerNameStr = playerName.toString().trim();
+            
+            // Input validation
+            if (playerNameStr.length > 20 || !/^[a-zA-Z0-9\s\-_]+$/.test(playerNameStr)) {
+                return {
+                    statusCode: 400,
+                    headers,
+                    body: JSON.stringify({ error: 'Invalid player name format' })
+                };
+            }
+            
+            if (scoreValue < 0 || scoreValue > 1000000 || isNaN(scoreValue)) {
+                return {
+                    statusCode: 400,
+                    headers,
+                    body: JSON.stringify({ error: 'Invalid score value' })
+                };
+            }
 
             // For personal bests, always save
             if (isPersonalBest) {

@@ -146,11 +146,22 @@ resource "aws_apigatewayv2_route" "post_score" {
   target    = "integrations/${aws_apigatewayv2_integration.leaderboard_integration.id}"
 }
 
-# API Gateway Stage
+# API Gateway Stage with throttling
 resource "aws_apigatewayv2_stage" "api_stage" {
   api_id      = aws_apigatewayv2_api.leaderboard_api.id
   name        = "prod"
   auto_deploy = true
+  
+  throttle_settings {
+    rate_limit  = 100
+    burst_limit = 200
+  }
+  
+  route_settings {
+    route_key = "POST /score"
+    throttling_rate_limit  = 10
+    throttling_burst_limit = 20
+  }
 }
 
 # Lambda permission for API Gateway
