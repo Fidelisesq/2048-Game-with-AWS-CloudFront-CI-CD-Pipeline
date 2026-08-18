@@ -44,6 +44,11 @@ resource "aws_cloudwatch_log_group" "leaderboard_lambda" {
   retention_in_days = var.log_retention_days
 }
 
+import {
+  to = aws_cloudwatch_log_group.leaderboard_lambda
+  id = "/aws/lambda/2048-leaderboard-api"
+}
+
 resource "aws_cloudwatch_log_group" "leaderboard_api" {
   name              = "/aws/apigateway/2048-leaderboard-api"
   retention_in_days = var.log_retention_days
