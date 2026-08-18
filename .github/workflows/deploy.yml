@@ -23,7 +23,7 @@ env:
   TF_VAR_domain_name: ${{ vars.DOMAIN_NAME || 'fozdigitalz.com' }}
   TF_VAR_enable_waf: ${{ vars.ENABLE_WAF || 'false' }}
   TF_VAR_hosted_zone_id: ${{ secrets.HOSTED_ZONE_ID }}
-  TF_VAR_subdomain: ${{ vars.SUBDOMAIN || 'play-2048' }}
+  TF_VAR_subdomain: ${{ vars.SUBDOMAIN || '2048' }}
 
 jobs:
   quality:

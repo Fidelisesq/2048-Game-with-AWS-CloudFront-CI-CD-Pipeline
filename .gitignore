@@ -4,6 +4,7 @@
 .terraform/
 terraform.tfvars
 *.tfvars
+terraform/*.zip
 
 # Node modules
 node_modules/

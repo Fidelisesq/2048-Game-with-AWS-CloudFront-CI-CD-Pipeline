@@ -24,7 +24,7 @@ variable "domain_name" {
 variable "subdomain" {
   description = "Game subdomain"
   type        = string
-  default     = "play-2048"
+  default     = "2048"
 }
 
 variable "hosted_zone_id" {

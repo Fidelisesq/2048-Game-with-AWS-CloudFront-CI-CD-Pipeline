@@ -1,6 +1,6 @@
 # 2048 on AWS
 
-An accessible, installable 2048 game with a small serverless leaderboard. The live application is [play-2048.fozdigitalz.com](https://play-2048.fozdigitalz.com/).
+An accessible, installable 2048 game with a small serverless leaderboard. The live application is [2048.fozdigitalz.com](https://2048.fozdigitalz.com/).
 
 ## Architecture
 
@@ -55,10 +55,10 @@ arn:aws:iam::211125602758:role/github-platform-actions-oidc
 Configure these GitHub settings before the first run:
 
 - Environment: `production`; add a required reviewer if deployment approval is desired.
-- Secret `ACM_CERTIFICATE_ARN`: an ACM certificate in `us-east-1` covering `play-2048.fozdigitalz.com`.
+- Secret `ACM_CERTIFICATE_ARN`: an ACM certificate in `us-east-1` covering `2048.fozdigitalz.com`.
 - Secret `HOSTED_ZONE_ID`: the Route 53 public hosted-zone ID.
 - Optional variable `DOMAIN_NAME` (default `fozdigitalz.com`).
-- Optional variable `SUBDOMAIN` (default `play-2048`).
+- Optional variable `SUBDOMAIN` (default `2048`).
 - Optional variable `ENABLE_WAF` (default `false`; enabling WAF adds cost).
 
 Because the jobs use the `production` environment, the OIDC role trust policy must allow the GitHub subject `repo:Fidelisesq/2048-Game:environment:production` and audience `sts.amazonaws.com`. The role also needs access to the Terraform state path and the AWS resources managed in `terraform/`.

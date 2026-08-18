@@ -5,7 +5,7 @@ const { DynamoDBDocumentClient, PutCommand, QueryCommand } = require('@aws-sdk/l
 const TABLE_NAME = process.env.TABLE_NAME || '2048-leaderboard';
 const SCORE_INDEX_NAME = process.env.SCORE_INDEX_NAME || 'ScoreIndex';
 const GAME_TYPE = process.env.GAME_TYPE || 'classic';
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://play-2048.fozdigitalz.com';
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://2048.fozdigitalz.com';
 const MAX_BODY_BYTES = 2048;
 const MAX_SCORE = 100_000_000;
 

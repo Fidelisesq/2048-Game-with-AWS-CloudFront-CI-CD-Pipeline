@@ -534,7 +534,7 @@ class Game2048 {
         ctx.fillStyle = '#776e65';
         ctx.font = '14px Arial';
         ctx.textAlign = 'center';
-        ctx.fillText('play-2048.fozdigitalz.com', 200, 450);
+        ctx.fillText('2048.fozdigitalz.com', 200, 450);
         
         return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
     }
