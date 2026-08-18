@@ -431,6 +431,16 @@ resource "aws_route53_record" "game_domain_ipv6" {
   }
 }
 
+import {
+  to = aws_route53_record.game_domain_ipv4
+  id = "Z053615514X9UZZVP030H_2048.fozdigitalz.com_A"
+}
+
+import {
+  to = aws_route53_record.game_domain_ipv6
+  id = "Z053615514X9UZZVP030H_2048.fozdigitalz.com_AAAA"
+}
+
 moved {
   from = aws_route53_record.game_domain
   to   = aws_route53_record.game_domain_ipv4
