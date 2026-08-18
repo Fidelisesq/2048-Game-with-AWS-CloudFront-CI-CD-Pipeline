@@ -25,7 +25,7 @@ There are no EC2 instances, containers, load balancers, or VPC components. Stati
 - Private, encrypted, versioned S3 content bucket with all public-access blocks enabled
 - CloudFront TLS 1.2+, HTTP-to-HTTPS redirect, IPv4/IPv6 DNS, compression, CSP, HSTS, clickjacking and MIME-sniffing protections
 - Optional AWS WAF managed rules and `/api` IP rate limiting (`enable_waf = true`)
-- Exact-origin CORS, API Gateway throttling, Lambda reserved concurrency, strict input validation, idempotent score writes, and safe DOM rendering
+- Exact-origin CORS, API Gateway throttling, strict input validation, idempotent score writes, and safe DOM rendering
 - DynamoDB encryption, point-in-time recovery, and production deletion protection
 - CloudFront access logs plus retained Lambda/API logs, X-Ray traces, and CloudWatch alarms
 - GitHub Actions OIDC—no long-lived AWS access keys—and actions pinned to immutable commits

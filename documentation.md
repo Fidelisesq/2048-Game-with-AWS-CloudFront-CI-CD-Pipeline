@@ -46,7 +46,6 @@ The workflow needs `s3:GetObject`, `s3:PutObject`, and `s3:DeleteObject` for its
 |---|---:|---|
 | API Gateway POST rate | 5 requests/second | Limits ordinary write traffic |
 | API Gateway POST burst | 10 | Absorbs brief legitimate bursts |
-| Lambda reserved concurrency | 10 | Caps backend concurrency and cost |
 | Lambda timeout | 5 seconds | Fails stalled requests quickly |
 | Player name | 20 normalized characters | Restricts abuse and display issues |
 | Maximum score | 100,000,000 | Rejects unreasonable writes |

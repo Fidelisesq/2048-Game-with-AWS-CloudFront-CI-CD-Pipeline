@@ -50,12 +50,6 @@ variable "waf_api_rate_limit" {
   default     = 500
 }
 
-variable "lambda_reserved_concurrency" {
-  description = "Maximum concurrent leaderboard Lambda executions"
-  type        = number
-  default     = 10
-}
-
 variable "log_retention_days" {
   description = "CloudWatch log retention"
   type        = number

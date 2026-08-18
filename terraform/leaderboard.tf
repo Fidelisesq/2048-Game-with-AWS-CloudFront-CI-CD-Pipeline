@@ -106,16 +106,15 @@ data "archive_file" "leaderboard_zip" {
 }
 
 resource "aws_lambda_function" "leaderboard_api" {
-  filename                       = data.archive_file.leaderboard_zip.output_path
-  function_name                  = "2048-leaderboard-api"
-  role                           = aws_iam_role.lambda_role.arn
-  handler                        = "index.handler"
-  runtime                        = "nodejs22.x"
-  architectures                  = ["arm64"]
-  memory_size                    = 128
-  timeout                        = 5
-  reserved_concurrent_executions = var.lambda_reserved_concurrency
-  source_code_hash               = data.archive_file.leaderboard_zip.output_base64sha256
+  filename         = data.archive_file.leaderboard_zip.output_path
+  function_name    = "2048-leaderboard-api"
+  role             = aws_iam_role.lambda_role.arn
+  handler          = "index.handler"
+  runtime          = "nodejs22.x"
+  architectures    = ["arm64"]
+  memory_size      = 128
+  timeout          = 5
+  source_code_hash = data.archive_file.leaderboard_zip.output_base64sha256
 
   environment {
     variables = {
