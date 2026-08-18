@@ -3,6 +3,7 @@ class Game2048 {
         this.grid = [];
         this.score = 0;
         this.size = 4;
+        this.stateKey = '2048-game-state-v1';
         this.hasWon = false;
         this.highScore = this.loadHighScore();
         this.playerBestScore = this.loadPlayerBestScore();
@@ -10,23 +11,39 @@ class Game2048 {
         this.soundEnabled = this.loadSoundSetting();
         this.achievedMilestones = new Set();
         this.milestones = [128, 256, 512, 1024, 2048];
-        this.init();
+        this.activeDialogCleanup = null;
+        this.gameOverHandled = false;
+        this.initAudio();
+        if (!this.restoreGameState()) {
+            this.init();
+        } else {
+            this.updateScore();
+            this.updateDisplay();
+            this.announceBoard('Saved game restored.');
+        }
         this.bindEvents();
         this.applyTheme();
         this.updateSoundButton();
-        this.initAudio();
+
+        if (typeof ResizeObserver !== 'undefined') {
+            this.resizeObserver = new ResizeObserver(() => this.updateDisplay());
+            this.resizeObserver.observe(document.querySelector('.game-container'));
+        }
     }
 
     init() {
         this.grid = Array(this.size).fill().map(() => Array(this.size).fill(0));
         this.score = 0;
         this.hasWon = false;
+        this.gameOverHandled = false;
         this.moveCount = 0;
         this.startTime = Date.now();
         this.updateScore();
         this.addRandomTile();
         this.addRandomTile();
         this.updateDisplay();
+        this.saveGameState();
+        this.announceBoard('New game started.');
         this.trackEvent('game_start');
     }
 
@@ -50,7 +67,21 @@ class Game2048 {
 
     updateDisplay() {
         const container = document.querySelector('.tile-container');
-        container.innerHTML = '';
+        if (!container) return;
+
+        container.replaceChildren();
+        const cells = [...document.querySelectorAll('.grid-cell')];
+        const containerRect = container.getBoundingClientRect();
+        const firstCellRect = cells[0]?.getBoundingClientRect();
+        const secondCellRect = cells[1]?.getBoundingClientRect();
+        const nextRowCellRect = cells[4]?.getBoundingClientRect();
+
+        if (!firstCellRect || !secondCellRect || !nextRowCellRect) return;
+
+        const stepX = secondCellRect.left - firstCellRect.left;
+        const stepY = nextRowCellRect.top - firstCellRect.top;
+        const originX = firstCellRect.left - containerRect.left;
+        const originY = firstCellRect.top - containerRect.top;
         
         for (let i = 0; i < this.size; i++) {
             for (let j = 0; j < this.size; j++) {
@@ -58,8 +89,7 @@ class Game2048 {
                     const tile = document.createElement('div');
                     tile.className = `tile tile-${this.grid[i][j]}`;
                     tile.textContent = this.grid[i][j];
-                    tile.style.left = `${j * 117 + 10}px`;
-                    tile.style.top = `${i * 117 + 10}px`;
+                    tile.style.transform = `translate(${originX + (j * stepX)}px, ${originY + (i * stepY)}px)`;
                     container.appendChild(tile);
                 }
             }
@@ -117,6 +147,8 @@ class Game2048 {
             this.addRandomTile();
             this.updateDisplay();
             this.updateScore();
+            this.saveGameState();
+            this.announceBoard();
             
             // Check milestones after updating display
             this.checkMilestones();
@@ -124,13 +156,16 @@ class Game2048 {
             // Check for win (only show once)
             if (!this.hasWon && this.checkWin()) {
                 this.hasWon = true;
+                this.saveGameState();
                 this.trackEvent('game_win', { score: this.score, moves: this.moveCount });
-                setTimeout(() => {
-                    if (confirm('You won! Reached 2048! Continue playing?')) {
-                        // Continue playing
-                    } else {
-                        this.restart();
-                    }
+                setTimeout(async () => {
+                    const continuePlaying = await this.showDialog({
+                        title: 'You reached 2048!',
+                        message: 'Would you like to continue playing?',
+                        confirmText: 'Continue playing',
+                        cancelText: 'Start a new game'
+                    });
+                    if (!continuePlaying.confirmed) this.restart();
                 }, 100);
             }
         }
@@ -180,8 +215,18 @@ class Game2048 {
     }
 
     bindEvents() {
+        document.getElementById('restart-button')?.addEventListener('click', () => this.requestRestart());
+        document.getElementById('share-button')?.addEventListener('click', () => this.shareScore());
+        document.getElementById('theme-button')?.addEventListener('click', () => this.toggleTheme());
+        document.getElementById('leaderboard-button')?.addEventListener('click', () => this.toggleLeaderboard());
+        document.getElementById('sound-button')?.addEventListener('click', () => this.toggleSound());
+        document.getElementById('milestone-continue')?.addEventListener('click', () => this.closeMilestone());
+        document.getElementById('score-form')?.addEventListener('submit', (event) => this.submitScore(event));
+
         // Keyboard events
         document.addEventListener('keydown', (e) => {
+            if (e.target.closest('input, textarea, select, button, [role="dialog"]')) return;
+
             switch(e.key) {
                 case 'ArrowLeft':
                     e.preventDefault();
@@ -211,11 +256,11 @@ class Game2048 {
             startX = e.touches[0].clientX;
             startY = e.touches[0].clientY;
             this.createRipple(e.touches[0].clientX, e.touches[0].clientY);
-        });
+        }, { passive: false });
         
         gameContainer.addEventListener('touchend', (e) => {
             e.preventDefault();
-            if (!startX || !startY) return;
+            if (startX == null || startY == null) return;
             
             const endX = e.changedTouches[0].clientX;
             const endY = e.changedTouches[0].clientY;
@@ -242,13 +287,14 @@ class Game2048 {
             // Check for game over on mobile even if no move was attempted
             if (!moveAttempted && this.checkLoss()) {
                 setTimeout(() => {
-                    alert('Game Over! No more moves available.');
-                    this.restart();
+                    this.handleGameOver();
                 }, 100);
             }
             
             startX = startY = null;
-        });
+        }, { passive: false });
+
+        gameContainer.addEventListener('click', () => gameContainer.focus());
     }
 
     createRipple(x, y) {
@@ -302,6 +348,60 @@ class Game2048 {
             }
         }
         return true;
+    }
+
+    saveGameState() {
+        const state = {
+            version: 1,
+            grid: this.grid,
+            score: this.score,
+            moveCount: this.moveCount,
+            hasWon: this.hasWon,
+            startTime: this.startTime,
+            achievedMilestones: [...this.achievedMilestones]
+        };
+
+        localStorage.setItem(this.stateKey, JSON.stringify(state));
+    }
+
+    restoreGameState() {
+        try {
+            const rawState = localStorage.getItem(this.stateKey);
+            if (!rawState) return false;
+
+            const state = JSON.parse(rawState);
+            const isValidGrid = Array.isArray(state.grid)
+                && state.grid.length === this.size
+                && state.grid.every((row) => Array.isArray(row)
+                    && row.length === this.size
+                    && row.every((value) => Number.isInteger(value) && value >= 0));
+
+            if (state.version !== 1 || !isValidGrid || !Number.isSafeInteger(state.score) || state.score < 0) {
+                localStorage.removeItem(this.stateKey);
+                return false;
+            }
+
+            this.grid = state.grid;
+            this.score = state.score;
+            this.moveCount = Number.isSafeInteger(state.moveCount) ? state.moveCount : 0;
+            this.hasWon = state.hasWon === true;
+            this.startTime = Number.isFinite(state.startTime) ? state.startTime : Date.now();
+            this.achievedMilestones = new Set(
+                Array.isArray(state.achievedMilestones) ? state.achievedMilestones : []
+            );
+            return true;
+        } catch {
+            localStorage.removeItem(this.stateKey);
+            return false;
+        }
+    }
+
+    announceBoard(prefix = '') {
+        const status = document.getElementById('game-status');
+        if (!status) return;
+
+        const highestTile = Math.max(...this.grid.flat(), 0);
+        status.textContent = `${prefix} Score ${this.score}. Highest tile ${highestTile}. Move ${this.moveCount}.`.trim();
     }
 
     loadHighScore() {
@@ -452,22 +552,27 @@ class Game2048 {
         // Create share modal
         const modal = document.createElement('div');
         modal.className = 'share-modal';
+        modal.setAttribute('role', 'dialog');
+        modal.setAttribute('aria-modal', 'true');
+        modal.setAttribute('aria-labelledby', 'share-dialog-title');
         modal.innerHTML = `
             <div class="share-content">
-                <h3>🎮 Share Your Score!</h3>
-                <p>${text}</p>
+                <h2 id="share-dialog-title">🎮 Share your score</h2>
+                <p class="share-message"></p>
                 <div class="share-buttons">
-                    <button class="share-btn twitter">🐦 Twitter</button>
-                    <button class="share-btn linkedin">💼 LinkedIn</button>
-                    <button class="share-btn facebook">📘 Facebook</button>
-                    <button class="share-btn copy">📋 Copy Link</button>
-                    ${imageBlob ? '<button class="share-btn download">📸 Download Image</button>' : ''}
+                    <button type="button" class="share-btn twitter">🐦 X / Twitter</button>
+                    <button type="button" class="share-btn linkedin">💼 LinkedIn</button>
+                    <button type="button" class="share-btn facebook">📘 Facebook</button>
+                    <button type="button" class="share-btn copy">📋 Copy link</button>
+                    ${imageBlob ? '<button type="button" class="share-btn download">📸 Download image</button>' : ''}
                 </div>
-                <button class="close-btn">✕</button>
+                <button type="button" class="close-btn" aria-label="Close share dialog">✕</button>
             </div>
         `;
+        modal.querySelector('.share-message').textContent = text;
         
         document.body.appendChild(modal);
+        const previousFocus = document.activeElement;
         
         // Store image blob for download
         if (imageBlob) {
@@ -476,12 +581,17 @@ class Game2048 {
         
         // Add event listeners with proper binding
         const self = this;
-        modal.querySelector('.twitter').onclick = () => window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${url}`, '_blank');
-        modal.querySelector('.linkedin').onclick = () => window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${url}&summary=${encodeURIComponent(text)}`, '_blank');
-        modal.querySelector('.facebook').onclick = () => window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
-        modal.querySelector('.copy').onclick = () => {
-            navigator.clipboard.writeText(`${text} ${url}`);
-            alert('Copied to clipboard!');
+        const openShareWindow = (shareUrl) => window.open(shareUrl, '_blank', 'noopener,noreferrer');
+        modal.querySelector('.twitter').onclick = () => openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`);
+        modal.querySelector('.linkedin').onclick = () => openShareWindow(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`);
+        modal.querySelector('.facebook').onclick = () => openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`);
+        modal.querySelector('.copy').onclick = async () => {
+            try {
+                await navigator.clipboard.writeText(`${text} ${url}`);
+                this.showToast('Link copied to clipboard.');
+            } catch {
+                this.showToast('Unable to copy the link. Please copy it from the address bar.', 'error');
+            }
         };
         if (imageBlob) {
             modal.querySelector('.download').onclick = () => {
@@ -493,9 +603,15 @@ class Game2048 {
                 URL.revokeObjectURL(imageUrl);
             };
         }
-        modal.querySelector('.close-btn').onclick = () => {
+        const closeModal = () => {
             modal.remove();
+            previousFocus?.focus();
         };
+        modal.querySelector('.close-btn').onclick = closeModal;
+        modal.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeModal();
+        });
+        modal.querySelector('.close-btn').focus();
     }
 
     loadTheme() {
@@ -508,10 +624,12 @@ class Game2048 {
 
     toggleTheme() {
         const themes = ['default', 'theme-dark', 'theme-neon'];
+        const labels = ['Default', 'Dark', 'Neon'];
         const currentIndex = themes.indexOf(this.currentTheme);
         this.currentTheme = themes[(currentIndex + 1) % themes.length];
         this.saveTheme();
         this.applyTheme();
+        this.showToast(`${labels[(currentIndex + 1) % themes.length]} theme selected.`);
     }
 
     applyTheme() {
@@ -526,12 +644,17 @@ class Game2048 {
 
     async toggleLeaderboard() {
         const leaderboard = document.getElementById('leaderboard');
+        const toggleButton = document.querySelector('.leaderboard-button');
         if (leaderboard.classList.contains('hidden')) {
             leaderboard.classList.remove('hidden');
+            leaderboard.hidden = false;
+            toggleButton.setAttribute('aria-expanded', 'true');
             this.initializePlayerName();
             await this.loadLeaderboard();
         } else {
             leaderboard.classList.add('hidden');
+            leaderboard.hidden = true;
+            toggleButton.setAttribute('aria-expanded', 'false');
         }
     }
 
@@ -544,52 +667,74 @@ class Game2048 {
 
     async loadLeaderboard() {
         const listElement = document.getElementById('leaderboard-list');
-        listElement.innerHTML = 'Loading...';
+        listElement.replaceChildren();
+        const loading = document.createElement('p');
+        loading.className = 'loading-state';
+        loading.textContent = 'Loading leaderboard…';
+        listElement.appendChild(loading);
         
         try {
             const apiUrl = this.getApiUrl();
-            console.log('Loading leaderboard from:', apiUrl + '/leaderboard');
-            const response = await fetch(apiUrl + '/leaderboard');
-            
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            
-            const scores = await response.json();
-            console.log('Leaderboard response:', scores);
+            const scores = await this.fetchJson(`${apiUrl}/leaderboard`);
+            listElement.replaceChildren();
             
             if (scores.length === 0) {
-                listElement.innerHTML = '<p>No scores yet. Be the first!</p>';
+                const emptyMessage = document.createElement('p');
+                emptyMessage.textContent = 'No scores yet. Be the first!';
+                listElement.appendChild(emptyMessage);
                 return;
             }
             
-            listElement.innerHTML = scores.map((score, index) => 
-                `<div class="leaderboard-entry">
-                    <span>#${index + 1} ${score.playerName}</span>
-                    <span>${score.score.toLocaleString()}</span>
-                </div>`
-            ).join('');
+            scores.forEach((score, index) => {
+                const entry = document.createElement('div');
+                entry.className = 'leaderboard-entry';
+
+                const player = document.createElement('span');
+                player.textContent = `#${index + 1} ${String(score.playerName || 'Anonymous')}`;
+
+                const scoreValue = document.createElement('span');
+                scoreValue.textContent = Number(score.score || 0).toLocaleString();
+
+                entry.append(player, scoreValue);
+                listElement.appendChild(entry);
+            });
         } catch (error) {
-            listElement.innerHTML = '<p>Failed to load leaderboard</p>';
+            listElement.replaceChildren();
+            const errorMessage = document.createElement('p');
+            errorMessage.textContent = 'The leaderboard is unavailable right now.';
+            const retryButton = document.createElement('button');
+            retryButton.type = 'button';
+            retryButton.textContent = 'Try again';
+            retryButton.addEventListener('click', () => this.loadLeaderboard());
+            listElement.append(errorMessage, retryButton);
             console.error('Leaderboard error:', error);
         }
     }
 
-    async submitScore() {
-        const playerName = document.getElementById('player-name').value.trim();
+    async submitScore(event) {
+        event?.preventDefault();
+        const input = document.getElementById('player-name');
+        const form = input.closest('form');
+        const submitButton = form.querySelector('button[type="submit"]');
+        const status = document.getElementById('submit-status');
+        const playerName = input.value.normalize('NFKC').trim();
+        status.textContent = '';
+
         if (!playerName) {
-            alert('Please enter your name');
+            status.textContent = 'Please enter your name.';
+            input.focus();
             return;
         }
         
-        // Basic input validation
-        if (playerName.length > 20 || !/^[a-zA-Z0-9\s-_]+$/.test(playerName)) {
-            alert('Name must be 20 characters or less and contain only letters, numbers, spaces, hyphens, and underscores');
+        if (playerName.length > 20 || !/^[\p{L}\p{N} _-]+$/u.test(playerName)) {
+            status.textContent = 'Use 20 characters or fewer: letters, numbers, spaces, hyphens or underscores.';
+            input.focus();
             return;
         }
         
         if (this.score === 0) {
-            alert('Play a game first!');
+            status.textContent = 'Make at least one scoring move before submitting.';
+            document.getElementById('game-board').focus();
             return;
         }
         
@@ -597,43 +742,64 @@ class Game2048 {
         const lastSubmit = localStorage.getItem('last-submit-time');
         const now = Date.now();
         if (lastSubmit && (now - parseInt(lastSubmit)) < 10000) {
-            alert('Please wait 10 seconds between submissions');
+            const seconds = Math.ceil((10000 - (now - parseInt(lastSubmit))) / 1000);
+            status.textContent = `Please wait ${seconds} seconds before submitting again.`;
             return;
         }
-        localStorage.setItem('last-submit-time', now.toString());
-        
-        // Save player name for future auto-submissions
-        localStorage.setItem('2048-player-name', playerName);
         
         try {
             const apiUrl = this.getApiUrl();
             const payload = { playerName, score: this.score, isPersonalBest: false };
-            
-            const response = await fetch(apiUrl + '/score', {
+            this.pendingSubmissionKey ||= crypto.randomUUID();
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting…';
+            status.textContent = 'Submitting score…';
+
+            const result = await this.fetchJson(`${apiUrl}/score`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': this.pendingSubmissionKey
                 },
                 body: JSON.stringify(payload)
             });
-            
-            const result = await response.json();
-            
-            if (response.ok) {
-                if (result.added) {
-                    alert(`Score submitted successfully! Ranked #${result.rank} on leaderboard.`);
-                } else {
-                    alert('Score submitted but not high enough for current leaderboard ranking.');
-                }
-                localStorage.setItem('last-submit-time', Date.now().toString());
-                document.getElementById('player-name').value = '';
-                await this.loadLeaderboard();
+
+            localStorage.setItem('2048-player-name', playerName);
+            localStorage.setItem('last-submit-time', Date.now().toString());
+            this.pendingSubmissionKey = null;
+            if (result.rank) {
+                status.textContent = `Score saved. You are number ${result.rank} on the leaderboard.`;
             } else {
-                alert(result.error || 'Failed to submit score');
+                status.textContent = 'Score saved. Keep playing to reach the top 10.';
             }
+            await this.loadLeaderboard();
         } catch (error) {
-            alert('Failed to submit score: ' + error.message);
+            status.textContent = error.message || 'Score submission failed. Please try again.';
             console.error('Submit score error:', error);
+        } finally {
+            submitButton.disabled = false;
+            submitButton.textContent = 'Submit current score';
+        }
+    }
+
+    async fetchJson(url, options = {}) {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+        try {
+            const response = await fetch(url, { ...options, signal: controller.signal });
+            const result = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                throw new Error(result.error || `Request failed with status ${response.status}`);
+            }
+            return result;
+        } catch (error) {
+            if (error.name === 'AbortError') {
+                throw new Error('The request timed out. Please try again.');
+            }
+            throw error;
+        } finally {
+            clearTimeout(timeoutId);
         }
     }
 
@@ -643,13 +809,13 @@ class Game2048 {
             console.log('Using dynamic API URL:', window.API_GATEWAY_URL);
             return window.API_GATEWAY_URL;
         }
-        // Fallback to hardcoded URL - replace with your actual API Gateway URL
-        const fallbackUrl = 'https://i4tar1ds8e.execute-api.us-east-1.amazonaws.com/prod';
-        console.log('Using fallback API URL:', fallbackUrl);
-        return fallbackUrl;
+        return '/api';
     }
 
     async handleGameOver() {
+        if (this.gameOverHandled) return;
+        this.gameOverHandled = true;
+
         const savedName = localStorage.getItem('2048-player-name');
         const isPersonalBest = this.score > this.playerBestScore;
         
@@ -658,21 +824,38 @@ class Game2048 {
             this.savePlayerBestScore();
             
             if (savedName) {
-                // Auto-save personal best with existing name
-                await this.autoSubmitScore(savedName);
-                alert(`Game Over! New personal best: ${this.score.toLocaleString()} points!\nScore automatically saved to leaderboard.`);
+                const saved = await this.autoSubmitScore(savedName);
+                await this.showDialog({
+                    title: 'New personal best!',
+                    message: `${this.score.toLocaleString()} points.${saved ? ' Your score was saved.' : ' The leaderboard is currently unavailable.'}`,
+                    confirmText: 'Start a new game',
+                    showCancel: false
+                });
             } else {
-                // Prompt for name for personal best
-                const playerName = prompt(`Game Over! New personal best: ${this.score.toLocaleString()} points!\nEnter your name to save to leaderboard:`);
-                if (playerName && playerName.trim()) {
-                    localStorage.setItem('2048-player-name', playerName.trim());
-                    await this.autoSubmitScore(playerName.trim());
-                } else {
-                    alert('Game Over! Score not saved.');
+                const result = await this.showDialog({
+                    title: 'New personal best!',
+                    message: `${this.score.toLocaleString()} points. Enter a name to save it to the leaderboard.`,
+                    inputLabel: 'Player name',
+                    confirmText: 'Save score',
+                    cancelText: 'Skip'
+                });
+                if (result.confirmed && result.value) {
+                    const playerName = result.value.normalize('NFKC').trim();
+                    if (/^[\p{L}\p{N} _-]{1,20}$/u.test(playerName)) {
+                        localStorage.setItem('2048-player-name', playerName);
+                        await this.autoSubmitScore(playerName);
+                    } else {
+                        this.showToast('The score was not saved because the name was invalid.', 'error');
+                    }
                 }
             }
         } else {
-            alert('Game Over! No more moves available.');
+            await this.showDialog({
+                title: 'Game over',
+                message: `Final score: ${this.score.toLocaleString()} points.`,
+                confirmText: 'Start a new game',
+                showCancel: false
+            });
         }
         
         this.restart();
@@ -681,10 +864,11 @@ class Game2048 {
     async autoSubmitScore(playerName) {
         try {
             const apiUrl = this.getApiUrl();
-            await fetch(apiUrl + '/score', {
+            await this.fetchJson(`${apiUrl}/score`, {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Idempotency-Key': crypto.randomUUID()
                 },
                 body: JSON.stringify({
                     playerName: playerName,
@@ -692,8 +876,10 @@ class Game2048 {
                     isPersonalBest: true
                 })
             });
+            return true;
         } catch (error) {
             console.error('Auto-submit failed:', error);
+            return false;
         }
     }
 
@@ -831,9 +1017,13 @@ class Game2048 {
         if (this.soundEnabled) {
             button.textContent = '🔊';
             button.classList.remove('muted');
+            button.setAttribute('aria-label', 'Mute sound');
+            button.setAttribute('aria-pressed', 'false');
         } else {
             button.textContent = '🔇';
             button.classList.add('muted');
+            button.setAttribute('aria-label', 'Turn sound on');
+            button.setAttribute('aria-pressed', 'true');
         }
     }
     
@@ -900,24 +1090,126 @@ class Game2048 {
         text.textContent = `You reached the ${value} tile!`;
         
         popup.classList.remove('hidden');
+        popup.hidden = false;
         
         // Play milestone sound - ascending chime
         this.playMilestoneSound();
-        
-        // Auto-hide after 1 second
-        setTimeout(() => {
-            popup.classList.add('hidden');
-        }, 1000);
+        popup.querySelector('button').focus();
     }
 
     closeMilestone() {
-        document.getElementById('milestone-popup').classList.add('hidden');
+        const popup = document.getElementById('milestone-popup');
+        popup.classList.add('hidden');
+        popup.hidden = true;
+        document.getElementById('game-board').focus();
+    }
+
+    showToast(message, type = 'success') {
+        const region = document.getElementById('toast-region');
+        if (!region) return;
+
+        const toast = document.createElement('div');
+        toast.className = `toast ${type === 'error' ? 'error' : ''}`.trim();
+        toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
+        toast.textContent = message;
+        region.appendChild(toast);
+
+        setTimeout(() => toast.remove(), 4500);
+    }
+
+    showDialog({
+        title,
+        message,
+        inputLabel = '',
+        defaultValue = '',
+        confirmText = 'Continue',
+        cancelText = 'Cancel',
+        showCancel = true
+    }) {
+        const modal = document.getElementById('app-dialog');
+        const titleElement = document.getElementById('dialog-title');
+        const messageElement = document.getElementById('dialog-message');
+        const input = document.getElementById('dialog-input');
+        const inputLabelElement = document.getElementById('dialog-input-label');
+        const confirmButton = document.getElementById('dialog-confirm');
+        const cancelButton = document.getElementById('dialog-cancel');
+        const previousFocus = document.activeElement;
+
+        this.activeDialogCleanup?.();
+        titleElement.textContent = title;
+        messageElement.textContent = message;
+        confirmButton.textContent = confirmText;
+        cancelButton.textContent = cancelText;
+        cancelButton.hidden = !showCancel;
+
+        const hasInput = Boolean(inputLabel);
+        inputLabelElement.textContent = inputLabel || 'Input';
+        inputLabelElement.classList.toggle('hidden', !hasInput);
+        input.classList.toggle('hidden', !hasInput);
+        input.hidden = !hasInput;
+        input.value = hasInput ? defaultValue : '';
+
+        modal.hidden = false;
+        modal.classList.remove('hidden');
+
+        return new Promise((resolve) => {
+            const finish = (confirmed) => {
+                cleanup();
+                modal.hidden = true;
+                modal.classList.add('hidden');
+                previousFocus?.focus();
+                resolve({ confirmed, value: hasInput ? input.value.trim() : '' });
+            };
+
+            const handleKeydown = (event) => {
+                if (event.key === 'Escape' && showCancel) finish(false);
+                if (event.key === 'Enter' && event.target === input) finish(true);
+            };
+
+            const cleanup = () => {
+                confirmButton.removeEventListener('click', confirm);
+                cancelButton.removeEventListener('click', cancel);
+                modal.removeEventListener('keydown', handleKeydown);
+                this.activeDialogCleanup = null;
+            };
+            const confirm = () => finish(true);
+            const cancel = () => finish(false);
+
+            this.activeDialogCleanup = cleanup;
+            confirmButton.addEventListener('click', confirm);
+            cancelButton.addEventListener('click', cancel);
+            modal.addEventListener('keydown', handleKeydown);
+            (hasInput ? input : confirmButton).focus();
+        });
+    }
+
+    async requestRestart() {
+        if (this.moveCount === 0 && this.score === 0) {
+            this.restart();
+            return;
+        }
+
+        const result = await this.showDialog({
+            title: 'Start a new game?',
+            message: 'Your current board will be replaced.',
+            confirmText: 'Start new game',
+            cancelText: 'Keep playing'
+        });
+        if (result.confirmed) this.restart();
     }
 
     restart() {
         this.achievedMilestones.clear();
+        localStorage.removeItem(this.stateKey);
         this.init();
+        document.getElementById('game-board').focus();
     }
 }
 
-const game = new Game2048();
+if (typeof module !== 'undefined' && module.exports) {
+    module.exports = { Game2048 };
+}
+
+if (typeof document !== 'undefined') {
+    globalThis.game = new Game2048();
+}

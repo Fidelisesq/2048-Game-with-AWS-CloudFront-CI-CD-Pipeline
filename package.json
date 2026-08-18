@@ -1,9 +1,10 @@
 {
   "name": "2048-game",
   "version": "1.0.0",
-  "description": "2048 Game with CI/CD Pipeline",
+  "description": "Accessible 2048 game with a serverless AWS leaderboard",
   "scripts": {
-    "test": "node test-simple.js",
+    "test": "npm run test:syntax && node --test test/game.test.js test/infrastructure.test.js test/lambda-validation.test.js test/static-security.test.js",
+    "test:syntax": "node --check script.js && node --check analytics.js && node --check pwa.js && node --check service-worker.js && node --check terraform/lambda/index.js",
     "start": "python -m http.server 8000"
   },
   "keywords": ["2048", "game", "javascript"],

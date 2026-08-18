@@ -1,0 +1,19 @@
+{
+  "name": "2048 Game",
+  "short_name": "2048",
+  "description": "Join matching tiles, reach 2048, and compete on the global leaderboard.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#faf8ef",
+  "theme_color": "#8f7a66",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

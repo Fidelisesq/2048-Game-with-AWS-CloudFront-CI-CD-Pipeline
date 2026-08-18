@@ -1,101 +1,152 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="description" content="Play 2048 in your browser, continue games across refreshes, and compete on the global leaderboard.">
+    <meta name="theme-color" content="#8f7a66">
+    <meta name="color-scheme" content="light dark">
+    <link rel="canonical" href="https://play-2048.fozdigitalz.com/">
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="2048 Game">
+    <meta property="og:description" content="Join the tiles, reach 2048, and compete on the global leaderboard.">
+    <meta property="og:url" content="https://play-2048.fozdigitalz.com/">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="2048 Game">
+    <meta name="twitter:description" content="Join the tiles, reach 2048, and compete on the global leaderboard.">
     <title>2048 Game</title>
     <link rel="icon" type="image/svg+xml" href="favicon.svg">
-    <link rel="stylesheet" type="text/css" href="style.css">
-    <link rel="stylesheet" type="text/css" href="share-modal.css">
-    <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-819F6L1LMC"></script>
-    <script>
-        window.dataLayer = window.dataLayer || [];
-        function gtag(){dataLayer.push(arguments);}
-        gtag('js', new Date());
-        gtag('config', 'G-819F6L1LMC');
-    </script>
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="share-modal.css">
+    <script defer src="analytics.js"></script>
 </head>
 <body>
-    <div class="container">
-        <div class="heading">
+    <a class="skip-link" href="#game-board">Skip to game board</a>
+
+    <main class="container">
+        <header class="heading">
             <h1 class="title">2048</h1>
-            <div class="score-container">
+            <div class="score-container" aria-label="Current scores" aria-live="polite">
                 <div class="score-box">
-                    <div class="score-label">SCORE</div>
-                    <div id="score">0</div>
+                    <span class="score-label">Score</span>
+                    <span id="score">0</span>
                 </div>
                 <div class="score-box">
-                    <div class="score-label">BEST</div>
-                    <div id="high-score">0</div>
+                    <span class="score-label">Best</span>
+                    <span id="high-score">0</span>
                 </div>
             </div>
-        </div>
-        <div class="game-container">
-            <div class="grid-container">
-                <div class="grid-row">
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
+        </header>
+
+        <section class="game-section" aria-labelledby="how-to-play">
+            <div
+                id="game-board"
+                class="game-container"
+                role="group"
+                tabindex="0"
+                aria-label="2048 game board. Use the arrow keys or swipe to move tiles."
+            >
+                <div class="grid-container" aria-hidden="true">
+                    <div class="grid-row">
+                        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                    </div>
+                    <div class="grid-row">
+                        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                    </div>
+                    <div class="grid-row">
+                        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                    </div>
+                    <div class="grid-row">
+                        <div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div><div class="grid-cell"></div>
+                    </div>
                 </div>
-                <div class="grid-row">
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                </div>
-                <div class="grid-row">
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                </div>
-                <div class="grid-row">
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                    <div class="grid-cell"></div>
-                </div>
+                <div class="tile-container" aria-hidden="true"></div>
             </div>
-            <div class="tile-container"></div>
-        </div>
-        <p class="game-explanation">
-            <strong>HOW TO PLAY:</strong> Use arrow keys on PC or swipe on mobile to move tiles. When two tiles with the same number touch, they merge into one! Your GOAL is a single tile of <strong>2048</strong>.
-        </p>
-        <div class="button-container">
-            <button class="restart-button" onclick="game.restart()">New Game</button>
-            <button class="share-button" onclick="game.shareScore()">Share Score</button>
-            <button class="theme-button" onclick="game.toggleTheme()">🎨 Theme</button>
-            <button class="leaderboard-button" onclick="game.toggleLeaderboard()">🏆 Leaderboard</button>
-        </div>
-        
-        <div class="sound-container">
-            <button class="sound-toggle" onclick="game.toggleSound()" id="sound-button">🔊</button>
-        </div>
-        
-        <div id="milestone-popup" class="milestone-popup hidden">
-            <div class="milestone-content">
-                <h2 id="milestone-title">Milestone Achieved!</h2>
-                <div id="milestone-tile">128</div>
-                <p id="milestone-text">You reached the 128 tile!</p>
-                <button onclick="game.closeMilestone()">Continue</button>
-            </div>
-        </div>
-        
-        <div id="leaderboard" class="leaderboard hidden">
-            <h3>🏆 Global Leaderboard</h3>
-            <div id="leaderboard-list">Loading...</div>
-            <div class="submit-score">
-                <div>
-                    <input type="text" id="player-name" placeholder="Enter your name" maxlength="20">
-                    <button onclick="game.submitScore()">Submit Current Score</button>
+            <p id="game-status" class="sr-only" aria-live="polite"></p>
+
+            <p id="how-to-play" class="game-explanation">
+                <strong>How to play:</strong> Use arrow keys on a keyboard or swipe on the board to move tiles.
+                Matching tiles merge. Reach <strong>2048</strong> to win.
+            </p>
+        </section>
+
+        <nav class="button-container" aria-label="Game controls">
+            <button type="button" id="restart-button" class="restart-button">New game</button>
+            <button type="button" id="share-button" class="share-button">Share score</button>
+            <button type="button" id="theme-button" class="theme-button" aria-label="Change colour theme">🎨 Theme</button>
+            <button
+                type="button"
+                id="leaderboard-button"
+                class="leaderboard-button"
+                aria-controls="leaderboard"
+                aria-expanded="false"
+            >🏆 Leaderboard</button>
+            <button
+                type="button"
+                class="sound-toggle"
+                id="sound-button"
+                aria-label="Mute sound"
+                aria-pressed="false"
+            >🔊</button>
+        </nav>
+
+        <section id="leaderboard" class="leaderboard hidden" aria-labelledby="leaderboard-heading" hidden>
+            <h2 id="leaderboard-heading">🏆 Global leaderboard</h2>
+            <div id="leaderboard-list" role="status" aria-live="polite">Loading…</div>
+            <form id="score-form" class="submit-score">
+                <label for="player-name">Player name</label>
+                <div class="submit-row">
+                    <input
+                        type="text"
+                        id="player-name"
+                        name="playerName"
+                        maxlength="20"
+                        autocomplete="nickname"
+                        inputmode="text"
+                        aria-describedby="player-name-help submit-status"
+                        required
+                    >
+                    <button type="submit">Submit current score</button>
                 </div>
-                <p class="submit-info">Personal bests are automatically saved. You can submit any score manually.</p>
+                <p id="player-name-help" class="submit-info">Use up to 20 letters, numbers, spaces, hyphens or underscores. Only the top 10 scores appear here.</p>
+                <p id="submit-status" class="form-status" role="status" aria-live="polite"></p>
+            </form>
+        </section>
+    </main>
+
+    <div id="milestone-popup" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="milestone-title" hidden>
+        <div class="modal-content milestone-content">
+            <h2 id="milestone-title">Milestone achieved!</h2>
+            <div id="milestone-tile">128</div>
+            <p id="milestone-text">You reached the 128 tile!</p>
+            <button type="button" id="milestone-continue">Continue</button>
+        </div>
+    </div>
+
+    <div id="app-dialog" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="dialog-title" hidden>
+        <div class="modal-content app-dialog-content">
+            <h2 id="dialog-title"></h2>
+            <p id="dialog-message"></p>
+            <label id="dialog-input-label" for="dialog-input" class="hidden">Player name</label>
+            <input id="dialog-input" class="hidden" type="text" maxlength="20" autocomplete="nickname">
+            <div class="dialog-actions">
+                <button type="button" id="dialog-cancel" class="secondary-button">Cancel</button>
+                <button type="button" id="dialog-confirm">Continue</button>
             </div>
         </div>
     </div>
-    <script src="config.js"></script>
-    <script src="script.js"></script>
+
+    <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+
+    <footer class="site-footer">
+        <a href="privacy.html">Privacy</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://github.com/Fidelisesq/2048-Game">Source code</a>
+    </footer>
+
+    <script defer src="config.js"></script>
+    <script defer src="script.js"></script>
+    <script defer src="pwa.js"></script>
 </body>
 </html>
